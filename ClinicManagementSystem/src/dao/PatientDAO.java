@@ -6,11 +6,6 @@ import util.DatabaseConnection;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
-
-/**
- * PatientDAO - Data Access Object for Patient operations
- * Week 9 - OOP Architecture Submission (Partial Implementation ~40%)
- */
 public class PatientDAO {
 
     private Connection getConn() {
@@ -86,18 +81,30 @@ public class PatientDAO {
     // Map ResultSet row to model object
     private Patient mapPatient(ResultSet rs) throws SQLException {
         return new Patient(
-            rs.getString("user_id"),
-            rs.getString("name"),
-            rs.getString("email"),
-            rs.getString("phone"),
-            rs.getString("password"),
-            rs.getDate("date_of_birth") != null ? rs.getDate("date_of_birth").toString() : "",
-            rs.getString("address"),
-            rs.getInt("age")
+                rs.getString("user_id"),
+                rs.getString("name"),
+                rs.getString("email"),
+                rs.getString("phone"),
+                rs.getString("password"),
+                rs.getDate("date_of_birth") != null ? rs.getDate("date_of_birth").toString() : "",
+                rs.getString("address"),
+                rs.getInt("age")
         );
     }
 
-    // TODO: addPatient() - implement self-registration in final version
-    // TODO: updatePatient() - implement profile editing in final version
-    // TODO: searchPatients() - implement advanced search in final version
+    // Update patient profile details
+    public boolean updatePatient(Patient patient) {
+        String sql = "UPDATE patients SET name = ?, email = ?, phone = ?, address = ? WHERE user_id = ?";
+        try (PreparedStatement ps = getConn().prepareStatement(sql)) {
+            ps.setString(1, patient.getName());
+            ps.setString(2, patient.getEmail());
+            ps.setString(3, patient.getPhone());
+            ps.setString(4, patient.getAddress());
+            ps.setString(5, patient.getUserId());
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("[PatientDAO] updatePatient error: " + e.getMessage());
+        }
+        return false;
+    }
 }
