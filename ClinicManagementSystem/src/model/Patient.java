@@ -33,7 +33,4 @@ public class Patient extends User {
 
     public int getAge() { return age; }
     public void setAge(int age) { this.age = age; }
-
-    // TODO: Add medical history in final version
-    // TODO: Add insurance information in final version
 }

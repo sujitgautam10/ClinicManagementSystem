@@ -1,7 +1,9 @@
 package ui;
 
 import dao.AppointmentDAO;
+import dao.DoctorDAO;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -16,19 +18,20 @@ import model.Appointment.Status;
 import model.Doctor;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * DoctorDashboard - Programmatic JavaFX (NO Scene Builder / FXML)
- * Week 9 - OOP Architecture Submission (Partial Implementation ~40%)
+ * Week 12 - Final Implementation
  *
- * Tabs: My Appointments | Manage Availability | My Profile
- * UI matches the provided HTML mockup exactly.
+ * Tabs: My Appointments | My Profile
  */
 public class DoctorDashboard {
 
-    private final Stage  stage;
-    private final Doctor doctor;
+    private final Stage          stage;
+    private       Doctor         doctor;
     private final AppointmentDAO appointmentDAO = new AppointmentDAO();
+    private final DoctorDAO      doctorDAO      = new DoctorDAO();
 
     public DoctorDashboard(Stage stage, Doctor doctor) {
         this.stage  = stage;
@@ -43,14 +46,13 @@ public class DoctorDashboard {
         TabPane tabPane = new TabPane();
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
-        Tab apptTab    = new Tab("My Appointments",    buildAppointmentsContent(tabPane));
-        Tab availTab   = new Tab("Manage Availability", buildAvailabilityContent());
-        Tab profileTab = new Tab("My Profile",         buildProfileContent());
+        Tab apptTab    = new Tab("My Appointments", buildAppointmentsContent(tabPane));
+        Tab profileTab = new Tab("My Profile",      buildProfileContent());
 
-        for (Tab t : List.of(apptTab, availTab, profileTab))
+        for (Tab t : List.of(apptTab, profileTab))
             t.setStyle("-fx-font-size: 13; -fx-font-weight: bold;");
 
-        tabPane.getTabs().addAll(apptTab, availTab, profileTab);
+        tabPane.getTabs().addAll(apptTab, profileTab);
         root.setCenter(tabPane);
 
         Scene scene = new Scene(root, 1050, 700);
@@ -69,9 +71,9 @@ public class DoctorDashboard {
         Label icon = new Label("👨‍⚕️");
         icon.setFont(Font.font(28));
         icon.setStyle(
-            "-fx-background-color: rgba(255,255,255,0.2);" +
-            "-fx-background-radius: 10;" +
-            "-fx-padding: 8 12 8 12;"
+                "-fx-background-color: rgba(255,255,255,0.2);" +
+                        "-fx-background-radius: 10;" +
+                        "-fx-padding: 8 12 8 12;"
         );
 
         VBox titleBox = new VBox(2);
@@ -88,12 +90,12 @@ public class DoctorDashboard {
 
         Button logoutBtn = new Button("🚪 Logout");
         logoutBtn.setStyle(
-            "-fx-background-color: rgba(255,255,255,0.2);" +
-            "-fx-text-fill: white;" +
-            "-fx-font-weight: bold;" +
-            "-fx-padding: 8 18 8 18;" +
-            "-fx-background-radius: 8;" +
-            "-fx-cursor: hand;"
+                "-fx-background-color: rgba(255,255,255,0.2);" +
+                        "-fx-text-fill: white;" +
+                        "-fx-font-weight: bold;" +
+                        "-fx-padding: 8 18 8 18;" +
+                        "-fx-background-radius: 8;" +
+                        "-fx-cursor: hand;"
         );
         logoutBtn.setOnAction(e -> new LoginScreen(stage).show());
 
@@ -101,32 +103,44 @@ public class DoctorDashboard {
         return header;
     }
 
-    // My Appointments tab — view and complete appointments
+    // My Appointments tab with stats and status filter
     private ScrollPane buildAppointmentsContent(TabPane tabPane) {
         VBox content = new VBox(20);
         content.setPadding(new Insets(30));
         content.setStyle("-fx-background-color: #f8f9fa;");
 
-        // Stats row
         List<Appointment> allAppts = appointmentDAO.getByDoctorId(doctor.getUserId());
         long scheduled = allAppts.stream().filter(a -> a.getStatus() == Status.SCHEDULED).count();
         long completed = allAppts.stream().filter(a -> a.getStatus() == Status.COMPLETED).count();
+        long cancelled = allAppts.stream().filter(a -> a.getStatus() == Status.CANCELLED).count();
 
+        // Stats row
         HBox statsRow = new HBox(16);
         statsRow.getChildren().addAll(
-            statCard("📅", String.valueOf(allAppts.size()), "Total Appointments", "#667eea", "#764ba2"),
-            statCard("⏳", String.valueOf(scheduled),       "Scheduled",          "#ffa751", "#ffe259"),
-            statCard("✓",  String.valueOf(completed),       "Completed",          "#56ab2f", "#a8e063")
+                statCard("📅", String.valueOf(allAppts.size()), "Total Appointments", "#667eea", "#764ba2"),
+                statCard("⏳", String.valueOf(scheduled),       "Scheduled",          "#ffa751", "#ffe259"),
+                statCard("✓",  String.valueOf(completed),       "Completed",          "#56ab2f", "#a8e063"),
+                statCard("✖",  String.valueOf(cancelled),       "Cancelled",          "#e74c3c", "#c0392b")
         );
 
-        // Appointments table
+        // Filter row
         VBox tableCard = card();
         tableCard.getChildren().add(sectionTitle("My Appointments"));
 
-        TableView<Appointment> table = new TableView<>(FXCollections.observableArrayList(allAppts));
+        HBox filterRow = new HBox(12);
+        filterRow.setAlignment(Pos.CENTER_LEFT);
+        Label filterLabel = formLabel("Filter by Status:");
+        ComboBox<String> statusFilter = new ComboBox<>();
+        statusFilter.getItems().addAll("All", "SCHEDULED", "COMPLETED", "CANCELLED");
+        statusFilter.getSelectionModel().select("All");
+        statusFilter.setStyle("-fx-font-size: 13;");
+        filterRow.getChildren().addAll(filterLabel, statusFilter);
+
+        ObservableList<Appointment> apptList = FXCollections.observableArrayList(allAppts);
+        TableView<Appointment> table = new TableView<>(apptList);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         table.setStyle("-fx-font-size: 13;");
-        table.setPrefHeight(280);
+        table.setPrefHeight(300);
 
         TableColumn<Appointment, String> colId     = col("ID",      "appointmentId");
         TableColumn<Appointment, String> colPat    = col("Patient",  "patientName");
@@ -134,9 +148,22 @@ public class DoctorDashboard {
         TableColumn<Appointment, String> colTime   = col("Time",     "appointmentTime");
         TableColumn<Appointment, String> colReason = col("Reason",   "reason");
 
-        TableColumn<Appointment, Appointment.Status> colStatus = new TableColumn<>("Status");
+        TableColumn<Appointment, Status> colStatus = new TableColumn<>("Status");
         colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
-        colStatus.setCellFactory(c -> statusCell());
+        colStatus.setCellFactory(c -> new TableCell<>() {
+            @Override protected void updateItem(Status s, boolean empty) {
+                super.updateItem(s, empty);
+                setText(empty || s == null ? null : s.name());
+                if (!empty && s != null) {
+                    setStyle(switch (s) {
+                        case SCHEDULED -> "-fx-background-color:#fff3cd;-fx-text-fill:#856404;-fx-background-radius:12;-fx-font-weight:bold;";
+                        case COMPLETED -> "-fx-background-color:#d4edda;-fx-text-fill:#155724;-fx-background-radius:12;-fx-font-weight:bold;";
+                        case CANCELLED -> "-fx-background-color:#f8d7da;-fx-text-fill:#721c24;-fx-background-radius:12;-fx-font-weight:bold;";
+                        default        -> "";
+                    });
+                }
+            }
+        });
 
         TableColumn<Appointment, Void> colAction = new TableColumn<>("Action");
         colAction.setCellFactory(c -> new TableCell<>() {
@@ -162,48 +189,22 @@ public class DoctorDashboard {
         });
 
         table.getColumns().addAll(colId, colPat, colDate, colTime, colReason, colStatus, colAction);
-        tableCard.getChildren().add(table);
 
+        // Status filter logic
+        statusFilter.setOnAction(e -> {
+            String selected = statusFilter.getValue();
+            apptList.clear();
+            if ("All".equals(selected)) {
+                apptList.addAll(allAppts);
+            } else {
+                apptList.addAll(allAppts.stream()
+                        .filter(a -> a.getStatus().name().equals(selected))
+                        .collect(Collectors.toList()));
+            }
+        });
+
+        tableCard.getChildren().addAll(filterRow, table);
         content.getChildren().addAll(statsRow, tableCard);
-        ScrollPane sp = new ScrollPane(content);
-        sp.setFitToWidth(true);
-        sp.setStyle("-fx-background-color: #f8f9fa;");
-        return sp;
-    }
-
-    // Availability tab — placeholder for Week 12
-    private ScrollPane buildAvailabilityContent() {
-        VBox content = new VBox(20);
-        content.setPadding(new Insets(30));
-        content.setStyle("-fx-background-color: #f8f9fa;");
-
-        // TODO: Full availability/schedule management in final version
-        VBox card = card();
-        card.setAlignment(Pos.CENTER);
-        card.setPadding(new Insets(60));
-
-        Label icon = new Label("🗓️");
-        icon.setFont(Font.font(56));
-
-        Label msg = new Label("Availability Management");
-        msg.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
-        msg.setTextFill(Color.web("#2c3e50"));
-
-        Label sub = new Label("This feature is under development and will be fully implemented in the Week 12 final submission.\n" +
-                              "Planned features: set working days, define time slots, block unavailable dates.");
-        sub.setFont(Font.font("Segoe UI", 14));
-        sub.setTextFill(Color.web("#7f8c8d"));
-        sub.setWrapText(true);
-        sub.setTextAlignment(TextAlignment.CENTER);
-        sub.setMaxWidth(500);
-
-        Label todo = new Label("// TODO: Implement availability scheduling in final version");
-        todo.setFont(Font.font("Courier New", 12));
-        todo.setTextFill(Color.web("#856404"));
-        todo.setStyle("-fx-background-color:#fff3cd; -fx-padding: 10 16 10 16; -fx-background-radius:6;");
-
-        card.getChildren().addAll(icon, msg, sub, todo);
-        content.getChildren().add(card);
 
         ScrollPane sp = new ScrollPane(content);
         sp.setFitToWidth(true);
@@ -211,48 +212,121 @@ public class DoctorDashboard {
         return sp;
     }
 
-    // Profile tab — show patient information
+    // Profile tab with edit functionality
     private ScrollPane buildProfileContent() {
         VBox content = new VBox(20);
         content.setPadding(new Insets(30));
         content.setStyle("-fx-background-color: #f8f9fa;");
 
         VBox profileCard = card();
-        profileCard.setMaxWidth(680);
+        profileCard.setMaxWidth(720);
 
         Label title = sectionTitle("My Profile");
         title.setPadding(new Insets(0, 0, 16, 0));
 
-        GridPane grid = new GridPane();
-        grid.setHgap(30);
-        grid.setVgap(0);
+        // View mode
+        GridPane viewGrid = new GridPane();
+        viewGrid.setHgap(30);
+        viewGrid.addRow(0, profileItem("Doctor ID",      doctor.getUserId()),
+                profileItem("Name",           doctor.getName()));
+        viewGrid.addRow(1, profileItem("Specialization", doctor.getSpecialization()),
+                profileItem("Qualifications", doctor.getQualifications()));
+        viewGrid.addRow(2, profileItem("Experience",     doctor.getExperienceYears() + " years"),
+                profileItem("Email",          doctor.getEmail()));
+        VBox phoneItem = profileItem("Phone", doctor.getPhone());
+        GridPane.setColumnSpan(phoneItem, 2);
+        viewGrid.add(phoneItem, 0, 3);
 
-        int row = 0;
-        grid.addRow(row++, profileItem("Doctor ID",       doctor.getUserId()),
-                           profileItem("Name",            doctor.getName()));
-        grid.addRow(row++, profileItem("Specialization",  doctor.getSpecialization()),
-                           profileItem("Qualifications",  doctor.getQualifications()));
-        grid.addRow(row++, profileItem("Experience",      doctor.getExperienceYears() + " years"),
-                           profileItem("Email",           doctor.getEmail()));
+        // Edit mode
+        GridPane editGrid = new GridPane();
+        editGrid.setHgap(16); editGrid.setVgap(12);
+        editGrid.setVisible(false); editGrid.setManaged(false);
 
-        VBox phoneRow = profileItem("Phone", doctor.getPhone());
-        GridPane.setColumnSpan(phoneRow, 2);
-        grid.add(phoneRow, 0, row);
+        TextField tfName  = styledField("Name");         tfName.setText(doctor.getName());
+        TextField tfEmail = styledField("Email");         tfEmail.setText(doctor.getEmail());
+        TextField tfPhone = styledField("Phone");         tfPhone.setText(doctor.getPhone());
+        TextField tfSpec  = styledField("Specialization"); tfSpec.setText(doctor.getSpecialization());
+        TextField tfQual  = styledField("Qualifications"); tfQual.setText(doctor.getQualifications());
+        TextField tfExp   = styledField("Experience");    tfExp.setText(String.valueOf(doctor.getExperienceYears()));
 
-        profileCard.getChildren().addAll(title, grid);
+        editGrid.addRow(0, formLabel("Name"),           tfName,  formLabel("Email"),          tfEmail);
+        editGrid.addRow(1, formLabel("Phone"),          tfPhone, formLabel("Specialization"), tfSpec);
+        editGrid.addRow(2, formLabel("Qualifications"), tfQual,  formLabel("Experience (yrs)"), tfExp);
 
-        // TODO: Edit profile form in final version
-        Label todo = new Label("ℹ️  Profile editing will be available in the final version.");
-        todo.setStyle(
-            "-fx-background-color: #fff3cd;" +
-            "-fx-border-color: #ffc107;" +
-            "-fx-border-radius: 8;" +
-            "-fx-background-radius: 8;" +
-            "-fx-padding: 12;" +
-            "-fx-font-size: 13;"
-        );
+        Label feedbackLbl = new Label("");
+        feedbackLbl.setFont(Font.font("Segoe UI", 13));
 
-        content.getChildren().addAll(profileCard, todo);
+        Button editBtn      = actionButton("✏ Edit Profile", "#3498db");
+        Button saveBtn      = actionButton("💾 Save Changes", "#27ae60");
+        Button cancelEditBtn = actionButton("✖ Cancel", "#95a5a6");
+        saveBtn.setVisible(false);      saveBtn.setManaged(false);
+        cancelEditBtn.setVisible(false); cancelEditBtn.setManaged(false);
+
+        editBtn.setOnAction(e -> {
+            viewGrid.setVisible(false); viewGrid.setManaged(false);
+            editGrid.setVisible(true);  editGrid.setManaged(true);
+            editBtn.setVisible(false);  editBtn.setManaged(false);
+            saveBtn.setVisible(true);   saveBtn.setManaged(true);
+            cancelEditBtn.setVisible(true); cancelEditBtn.setManaged(true);
+            feedbackLbl.setText("");
+        });
+
+        cancelEditBtn.setOnAction(e -> {
+            viewGrid.setVisible(true);  viewGrid.setManaged(true);
+            editGrid.setVisible(false); editGrid.setManaged(false);
+            editBtn.setVisible(true);   editBtn.setManaged(true);
+            saveBtn.setVisible(false);  saveBtn.setManaged(false);
+            cancelEditBtn.setVisible(false); cancelEditBtn.setManaged(false);
+            feedbackLbl.setText("");
+        });
+
+        saveBtn.setOnAction(e -> {
+            if (tfName.getText().isBlank()) {
+                feedbackLbl.setTextFill(Color.RED);
+                feedbackLbl.setText("Name cannot be empty.");
+                return;
+            }
+            int exp = 0;
+            try { exp = Integer.parseInt(tfExp.getText().trim()); } catch (NumberFormatException ignored) {}
+
+            doctor.setName(tfName.getText().trim());
+            doctor.setEmail(tfEmail.getText().trim());
+            doctor.setPhone(tfPhone.getText().trim());
+            doctor.setSpecialization(tfSpec.getText().trim());
+            doctor.setQualifications(tfQual.getText().trim());
+            doctor.setExperienceYears(exp);
+
+            boolean ok = doctorDAO.updateDoctor(doctor);
+            if (ok) {
+                feedbackLbl.setTextFill(Color.web("#27ae60"));
+                feedbackLbl.setText("Profile updated successfully.");
+
+                viewGrid.getChildren().clear();
+                viewGrid.addRow(0, profileItem("Doctor ID",      doctor.getUserId()),
+                        profileItem("Name",           doctor.getName()));
+                viewGrid.addRow(1, profileItem("Specialization", doctor.getSpecialization()),
+                        profileItem("Qualifications", doctor.getQualifications()));
+                viewGrid.addRow(2, profileItem("Experience",     doctor.getExperienceYears() + " years"),
+                        profileItem("Email",          doctor.getEmail()));
+                VBox ph = profileItem("Phone", doctor.getPhone());
+                GridPane.setColumnSpan(ph, 2);
+                viewGrid.add(ph, 0, 3);
+
+                viewGrid.setVisible(true);  viewGrid.setManaged(true);
+                editGrid.setVisible(false); editGrid.setManaged(false);
+                editBtn.setVisible(true);   editBtn.setManaged(true);
+                saveBtn.setVisible(false);  saveBtn.setManaged(false);
+                cancelEditBtn.setVisible(false); cancelEditBtn.setManaged(false);
+            } else {
+                feedbackLbl.setTextFill(Color.RED);
+                feedbackLbl.setText("Failed to update profile. Please try again.");
+            }
+        });
+
+        HBox btnRow = new HBox(10, editBtn, saveBtn, cancelEditBtn);
+        profileCard.getChildren().addAll(title, viewGrid, editGrid, btnRow, feedbackLbl);
+        content.getChildren().add(profileCard);
+
         ScrollPane sp = new ScrollPane(content);
         sp.setFitToWidth(true);
         sp.setStyle("-fx-background-color: #f8f9fa;");
@@ -264,9 +338,9 @@ public class DoctorDashboard {
         VBox box = new VBox(14);
         box.setPadding(new Insets(22));
         box.setStyle(
-            "-fx-background-color: white;" +
-            "-fx-background-radius: 12;" +
-            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.07), 10, 0, 0, 3);"
+                "-fx-background-color: white;" +
+                        "-fx-background-radius: 12;" +
+                        "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.07), 10, 0, 0, 3);"
         );
         return box;
     }
@@ -278,12 +352,47 @@ public class DoctorDashboard {
         return lbl;
     }
 
+    private Label formLabel(String text) {
+        Label lbl = new Label(text);
+        lbl.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
+        lbl.setTextFill(Color.web("#2c3e50"));
+        return lbl;
+    }
+
+    private TextField styledField(String prompt) {
+        TextField tf = new TextField();
+        tf.setPromptText(prompt);
+        tf.setStyle(
+                "-fx-padding: 9 12 9 12;" +
+                        "-fx-border-color: #dfe6e9;" +
+                        "-fx-border-width: 2;" +
+                        "-fx-border-radius: 7;" +
+                        "-fx-background-radius: 7;" +
+                        "-fx-font-size: 13;"
+        );
+        return tf;
+    }
+
+    private Button actionButton(String text, String color) {
+        Button btn = new Button(text);
+        btn.setStyle(
+                "-fx-background-color: " + color + ";" +
+                        "-fx-text-fill: white;" +
+                        "-fx-font-weight: bold;" +
+                        "-fx-padding: 6 12 6 12;" +
+                        "-fx-background-radius: 6;" +
+                        "-fx-cursor: hand;" +
+                        "-fx-font-size: 12;"
+        );
+        return btn;
+    }
+
     private VBox statCard(String emoji, String value, String label, String c1, String c2) {
         VBox box = new VBox(5);
         box.setPadding(new Insets(22));
         box.setStyle(String.format(
-            "-fx-background-color: linear-gradient(to bottom right, %s, %s);" +
-            "-fx-background-radius: 12;", c1, c2));
+                "-fx-background-color: linear-gradient(to bottom right, %s, %s);" +
+                        "-fx-background-radius: 12;", c1, c2));
         HBox.setHgrow(box, Priority.ALWAYS);
 
         Label emojiLbl = new Label(emoji); emojiLbl.setFont(Font.font(32));
@@ -315,36 +424,5 @@ public class DoctorDashboard {
         TableColumn<T, String> c = new TableColumn<>(header);
         c.setCellValueFactory(new PropertyValueFactory<>(prop));
         return c;
-    }
-
-    private Button actionButton(String text, String color) {
-        Button btn = new Button(text);
-        btn.setStyle(
-            "-fx-background-color: " + color + ";" +
-            "-fx-text-fill: white;" +
-            "-fx-font-weight: bold;" +
-            "-fx-padding: 6 12 6 12;" +
-            "-fx-background-radius: 6;" +
-            "-fx-cursor: hand;" +
-            "-fx-font-size: 12;"
-        );
-        return btn;
-    }
-
-    private TableCell<Appointment, Appointment.Status> statusCell() {
-        return new TableCell<>() {
-            @Override protected void updateItem(Status s, boolean empty) {
-                super.updateItem(s, empty);
-                setText(empty || s == null ? null : s.name());
-                if (!empty && s != null) {
-                    setStyle(switch (s) {
-                        case SCHEDULED -> "-fx-background-color:#fff3cd;-fx-text-fill:#856404;-fx-background-radius:12;-fx-font-weight:bold;";
-                        case COMPLETED -> "-fx-background-color:#d4edda;-fx-text-fill:#155724;-fx-background-radius:12;-fx-font-weight:bold;";
-                        case CANCELLED -> "-fx-background-color:#f8d7da;-fx-text-fill:#721c24;-fx-background-radius:12;-fx-font-weight:bold;";
-                        default        -> "";
-                    });
-                }
-            }
-        };
     }
 }

@@ -80,6 +80,4 @@ public class Appointment {
                "', doctor='" + doctorName + "', date='" + appointmentDate + "', status=" + status + "}";
     }
 
-    // TODO: Add reminder notification support in final version
-    // TODO: Add recurring appointment support in final version
 }
