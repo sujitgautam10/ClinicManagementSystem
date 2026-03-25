@@ -1,9 +1,4 @@
 package model;
-
-/**
- * Appointment model class
- * Week 9 - OOP Architecture Submission (Partial Implementation ~40%)
- */
 public class Appointment {
 
     // Enum for appointment status (OOP concept)
